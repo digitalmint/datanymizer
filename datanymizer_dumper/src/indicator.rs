@@ -36,14 +36,22 @@ impl Indicator for ConsoleIndicator {
     fn start_pb(&self, size: u64, name: &str) {
         self.pb.set_length(size);
         self.pb.set_prefix(name.to_owned());
-        self.pb.set_style(
+        let template =
             ProgressStyle::default_bar()
                 .template(
                     "[Dumping: {prefix}] [|{bar:50}|] {pos} of {len} rows [{percent}%] ({eta})",
-                )
-                .unwrap()
-                .progress_chars("#>-"),
-        );
+                );
+        match template {
+            Ok(t) => {
+                self.pb.set_style(
+                    t.progress_chars("#>-"),
+                );
+
+            }
+            Err(e) => {
+                self.debug_msg(&format!("{}", e));
+            }
+        }
     }
 
     fn inc_pb(&self, i: u64) {
