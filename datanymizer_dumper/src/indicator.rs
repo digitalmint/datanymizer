@@ -34,22 +34,30 @@ impl Default for ConsoleIndicator {
 
 impl Indicator for ConsoleIndicator {
     fn start_pb(&self, size: u64, name: &str) {
-        self.pb.set_length(size);
-        self.pb.set_prefix(name.to_owned());
-        let template =
-            ProgressStyle::default_bar()
-                .template(
-                    "[Dumping: {prefix}] [|{bar:50}|] {pos} of {len} rows [{percent}%] ({eta})",
-                );
-        match template {
-            Ok(t) => {
-                self.pb.set_style(
-                    t.progress_chars("#>-"),
-                );
+        let result = panic::catch_unwind(|| {
+            self.pb.set_length(size);
+            self.pb.set_prefix(name.to_owned());
+            let template =
+                ProgressStyle::default_bar()
+                    .template(
+                        "[Dumping: {prefix}] [|{bar:50}|] {pos} of {len} rows [{percent}%] ({eta})",
+                    );
+            match template {
+                Ok(t) => {
+                    self.pb.set_style(
+                        t.progress_chars("#>-"),
+                    );
+                }
+                Err(e) => {
+                    self.debug_msg(&format!("{}", e));
+                }
             }
+        });
+        match result {
+            Ok(_) => {},
             Err(e) => {
-                self.debug_msg(&format!("{}", e));
-            }
+                self.debug_msg(&format!("inc_pb panic caught: {:?}", e))
+            },
         }
     }
 
@@ -80,9 +88,7 @@ impl Indicator for ConsoleIndicator {
         self.debug_msg(
             format!(
                 "[Dumping: {}] Finished in {}",
-                name,
-                HumanDuration(duration)
-            )
+                name, HumanDuration(duration))
             .as_str(),
         );
     }
