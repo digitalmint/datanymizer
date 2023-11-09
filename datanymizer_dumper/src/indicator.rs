@@ -1,5 +1,5 @@
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
-use std::time::Duration;
+use std::{time::Duration, panic};
 
 pub trait Indicator {
     fn start_pb(&self, _size: u64, _prefix: &str) {}
@@ -46,7 +46,6 @@ impl Indicator for ConsoleIndicator {
                 self.pb.set_style(
                     t.progress_chars("#>-"),
                 );
-
             }
             Err(e) => {
                 self.debug_msg(&format!("{}", e));
@@ -55,7 +54,15 @@ impl Indicator for ConsoleIndicator {
     }
 
     fn inc_pb(&self, i: u64) {
-        self.pb.inc(i);
+        let result = panic::catch_unwind(||{
+            self.pb.inc(i);
+        });
+        match result {
+            Ok(_) => {},
+            Err(e) => {
+                self.debug_msg(&format!("inc_pb panic caught: {:?}", e))
+            },
+        }
     }
 
     fn finish_pb(&self, name: &str, duration: Duration) {
