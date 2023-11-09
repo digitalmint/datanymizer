@@ -66,8 +66,16 @@ impl Indicator for ConsoleIndicator {
     }
 
     fn finish_pb(&self, name: &str, duration: Duration) {
-        self.pb.finish();
-        self.pb.reset();
+        let result = panic::catch_unwind(||{
+            self.pb.finish();
+            self.pb.reset();
+        });
+        match result {
+            Ok(_) => {},
+            Err(e) => {
+                self.debug_msg(&format!("pb finish/reset panic caught: {:?}", e))
+            },
+        }
 
         self.debug_msg(
             format!(
