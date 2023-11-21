@@ -1,7 +1,26 @@
 
 use crate::transformer::{Transformer, TransformContext, TransformError};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
+pub struct PhoneNorthAmericaAreaCodeTransformer { }
+
+impl Transformer for PhoneNorthAmericaAreaCodeTransformer {
+    fn transform(
+        &self,
+        _field_name: &str,
+        _field_value: &str,
+        _ctx: &Option<TransformContext>,
+    ) -> Result<Option<String>, TransformError> {
+        let mut rng = rand::thread_rng();
+        let area_code = AREA_CODES[
+            rng.gen_range(0..AREA_CODES.len())
+        ];
+        return Ok(Some(format!("{}", area_code)))
+    }
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct PhoneNorthAmericaTransformer {
@@ -80,7 +99,33 @@ static STATE_MIDDLE_DIGITS: Mutex<u32> = Mutex::new(0);
 static STATE_AREA_CODE: Mutex<u32> = Mutex::new(0);
 
 mod tests {
-    use crate::{transformer::TransformResult, utils::EnumWrapper, Transformer, Transformers, transformers::PhoneNorthAmericaTransformer};
+    use crate::{utils::EnumWrapper, Transformer, Transformers,
+         transformers::PhoneNorthAmericaTransformer,
+         transformers::PhoneNorthAmericaAreaCodeTransformer,
+    };
+
+    #[test]
+    fn parse_config_to_phone_north_america_area_code_transformer() {
+        let config = r#"
+        phone_north_america_area_code: {}
+        "#;
+        let transformer: Transformers = EnumWrapper::parse(config).unwrap();
+        assert!(matches!(transformer, Transformers::PhoneNorthAmericaAreaCode(PhoneNorthAmericaAreaCodeTransformer{})));
+    }
+
+    #[test]
+    fn generate_phone_north_america_area_code() {
+        let config = r#"
+        phone_north_america_area_code: {}
+        "#;
+
+        let transformer: Transformers = EnumWrapper::parse(config).unwrap();
+
+        let val1 = transformer.transform("field", "value", &None);
+        let val2 = transformer.transform("field", "value", &None);
+
+        assert_ne!(val1, val2);
+    }
 
     #[test]
     fn parse_config_to_phone_north_america_transformer() {

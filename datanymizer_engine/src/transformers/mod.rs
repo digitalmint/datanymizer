@@ -12,6 +12,7 @@ pub use phone::PhoneTransformer;
 
 mod phone_north_america;
 pub use phone_north_america::PhoneNorthAmericaTransformer;
+pub use phone_north_america::PhoneNorthAmericaAreaCodeTransformer;
 
 mod pipeline;
 pub use pipeline::PipelineTransformer;
@@ -85,6 +86,7 @@ define_transformers_enum![
     ("ip", Ip, IpTransformer),
     ("phone", Phone, PhoneTransformer),
     ("phone_north_america", PhoneNorthAmerica, PhoneNorthAmericaTransformer),
+    ("phone_north_america_area_code", PhoneNorthAmericaAreaCode, PhoneNorthAmericaAreaCodeTransformer),
     ("pipeline", Pipeline, PipelineTransformer<Transformers>),
     ("capitalize", Capitalize, CapitalizeTransformer),
     ("template", Template, TemplateTransformer),

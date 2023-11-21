@@ -799,6 +799,11 @@ phone_north_america:
     middle555: true
 ```
 
+
+#### phone_north_america_area_code
+
+Randomly chooses a valid north america area code.
+
 #### user_agent 🌐
 
 Gets a User-Agent header.
