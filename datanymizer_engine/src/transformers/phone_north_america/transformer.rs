@@ -98,6 +98,7 @@ static STATE_LOWER_DIGITS: Mutex<u32> = Mutex::new(0);
 static STATE_MIDDLE_DIGITS: Mutex<u32> = Mutex::new(0);
 static STATE_AREA_CODE: Mutex<u32> = Mutex::new(0);
 
+#[cfg(test)] 
 mod tests {
     use crate::{utils::EnumWrapper, Transformer, Transformers,
          transformers::PhoneNorthAmericaTransformer,
