@@ -133,14 +133,20 @@ impl Options {
         }
 
         let mut url = Url::parse(format!("postgres://{}", self.host).as_str())?;
-        url.set_port(self.port)
-            .map_err(|_| anyhow!("Cannot set port"))?;
+        if self.port.is_some() {
+            url.set_port(self.port)
+                .map_err(|_| anyhow!("Cannot set port"))?;
+        }
 
-        url.set_username(self.username.as_deref().unwrap_or_default())
-            .map_err(|_| anyhow!("Cannot set username"))?;
+        if self.username.is_some() {
+            url.set_username(self.username.as_deref().unwrap_or_default())
+                .map_err(|_| anyhow!("Cannot set username"))?;
+        }
 
-        url.set_password(self.password.as_deref())
-            .map_err(|_| anyhow!("Cannot set password"))?;
+        if self.password.is_some() {
+            url.set_password(self.password.as_deref())
+                .map_err(|_| anyhow!("Cannot set password"))?;
+        }
 
         url.set_path(&db_name);
 
