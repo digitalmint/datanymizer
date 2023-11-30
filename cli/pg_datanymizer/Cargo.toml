@@ -19,3 +19,4 @@ datanymizer_engine = {path = "../../datanymizer_engine"}
 env_logger = "0.10.0"
 structopt = "0.3.26"
 url = "2.3"
+openssl = { version = "=0.10.55" }
