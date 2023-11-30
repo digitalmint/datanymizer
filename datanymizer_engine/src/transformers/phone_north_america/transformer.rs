@@ -15,8 +15,8 @@ impl Transformer for PhoneNorthAmericaAreaCodeTransformer {
         _ctx: &Option<TransformContext>,
     ) -> Result<Option<String>, TransformError> {
         let mut rng = rand::thread_rng();
-        let area_code = AREA_CODES[
-            rng.gen_range(0..AREA_CODES.len())
+        let area_code = REAL_AREA_CODES[
+            rng.gen_range(0..REAL_AREA_CODES.len())
         ];
         return Ok(Some(format!("{}", area_code)))
     }
@@ -35,60 +35,65 @@ impl Transformer for PhoneNorthAmericaTransformer {
         _field_value: &str,
         _ctx: &Option<TransformContext>,
     ) -> Result<Option<String>, TransformError> {
-        let mut state_lower_digits = STATE_LOWER_DIGITS.lock().unwrap();
-        let mut state_middle_digits = STATE_MIDDLE_DIGITS.lock().unwrap();
-        let mut state_area_code = STATE_AREA_CODE.lock().unwrap();
+        let (lower, mut inc_upper) = {
+            let mut state_lower_digits = STATE_LOWER_DIGITS.lock().unwrap();
+            let existing_lower = *state_lower_digits;
+            let inc_upper = existing_lower == 9999;
+            if inc_upper {
+                *state_lower_digits = 0;
+            } else {
+                *state_lower_digits = *state_lower_digits + 1;
+            }
+            (existing_lower, inc_upper)
+        };
 
-        let lower = *state_lower_digits;
 
         let middle = if self.middle555.unwrap_or_default() {
             555
         } else {
-            *state_middle_digits 
-        };
-
-        let area_code = if self.real_area_code.unwrap_or_default() && *state_area_code == 0 {
-            AREA_CODES[0]
-        } else {
-            100
-        };
-
-        { // increment state
-
-            // lower
-            *state_lower_digits = *state_lower_digits + 1;
-            let mut inc_upper = *state_lower_digits % 10000 == 0;
-
+            let mut state_middle_digits = STATE_MIDDLE_DIGITS.lock().unwrap();
+            let existing_middle = *state_middle_digits;
             // middle
             if inc_upper {
-                *state_middle_digits = *state_middle_digits + 1;
-                inc_upper = *state_middle_digits % 1000 == 0;
+                inc_upper = existing_middle == 999;
+                if inc_upper {
+                    *state_middle_digits = 0
+                } else {
+                    *state_middle_digits = *state_middle_digits + 1;
+                }
             }
+            existing_middle
+        };
 
-            // area
+        let area_code = {
+            let mut state_area_code = STATE_AREA_CODE.lock().unwrap();
+            let existing_area_code = if *state_area_code != 0 {
+                    *state_area_code  
+            } else {
+                if self.real_area_code.unwrap_or_default() {
+                    REAL_AREA_CODES[0]
+                } else {
+                    100
+                }
+            };
             if inc_upper {
                 if !self.real_area_code.unwrap_or_default() {
-                    *state_area_code = area_code + 1 % 1000;
+                    *state_area_code = existing_area_code + 1 % 1000;
                 } else {
-                    let mut found = false;
-                    let mut bumped = false;
-                    for code in AREA_CODES.iter() {
-                        if *code == area_code {
-                            found = true;
-                            continue
+                    *state_area_code = match REAL_AREA_CODES.iter().position(|code| *code == existing_area_code) {
+                        None => REAL_AREA_CODES[0],
+                        Some(existing_index) => {
+                            if existing_index == REAL_AREA_CODES.len() - 1 {
+                                REAL_AREA_CODES[0]
+                            } else {
+                                REAL_AREA_CODES[existing_index + 1]
+                            }
                         }
-                        if found {
-                            *state_area_code = *code;
-                            bumped = true;
-                        }
-                    }
-                    // wrap around
-                    if !bumped {
-                        *state_area_code = AREA_CODES[0];
                     }
                 }
             }
-        }
+            existing_area_code
+        };
 
         return Ok(Some(format!("+1-{area_code}-{middle:03}-{lower:04}")))
     }
@@ -104,6 +109,7 @@ mod tests {
          transformers::PhoneNorthAmericaTransformer,
          transformers::PhoneNorthAmericaAreaCodeTransformer,
     };
+    use serial_test::serial;
 
     #[test]
     fn parse_config_to_phone_north_america_area_code_transformer() {
@@ -115,7 +121,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn generate_phone_north_america_area_code() {
+        reset_state();
         let config = r#"
         phone_north_america_area_code: {}
         "#;
@@ -126,6 +134,17 @@ mod tests {
         let val2 = transformer.transform("field", "value", &None);
 
         assert_ne!(val1, val2);
+    }
+
+    fn reset_state() {
+        let mut state_lower_digits = super::STATE_LOWER_DIGITS.lock().unwrap();
+        let mut state_middle_digits = super::STATE_MIDDLE_DIGITS.lock().unwrap();
+        let mut state_area_code = super::STATE_AREA_CODE.lock().unwrap();
+        println!("lower was {}", *state_lower_digits);
+        *state_lower_digits = 0;
+        println!("lower set to 0 {}", *state_lower_digits);
+        *state_middle_digits = 0;
+        *state_area_code = 0;
     }
 
     #[test]
@@ -144,7 +163,38 @@ mod tests {
     }
 
     #[test]
-    fn generate_phone_north_america_number() {
+    #[serial]
+    fn generate_phone_north_america_real_area_code() {
+        reset_state();
+        let config = r#"
+        phone_north_america:
+            real_area_code: true
+        "#;
+
+        let transformer: Transformers = EnumWrapper::parse(config).unwrap();
+
+        let val1 = transformer.transform("field", "value", &None);
+        let val2 = transformer.transform("field", "value", &None);
+
+        assert_eq!(val1.unwrap().unwrap(), "+1-201-000-0000");
+        assert_eq!(val2.unwrap().unwrap(), "+1-201-000-0001");
+
+        for i in 0..10000 {
+            let val = transformer.transform("field", "value", &None);
+            let phone = val.unwrap().unwrap();
+            if i == 1000 {
+                assert_eq!(phone, "+1-201-000-1002");
+            }
+            if i == 9999 {
+                assert_eq!(phone, "+1-201-001-0001");
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn generate_phone_north_america_middle555() {
+        reset_state();
         let config = r#"
         phone_north_america:
             real_area_code: true
@@ -158,10 +208,21 @@ mod tests {
 
         assert_eq!(val1.unwrap().unwrap(), "+1-201-555-0000");
         assert_eq!(val2.unwrap().unwrap(), "+1-201-555-0001");
+
+        for i in 0..10000 {
+            let val = transformer.transform("field", "value", &None);
+            let phone = val.unwrap().unwrap();
+            if i == 1000 {
+                assert_eq!(phone, "+1-201-555-1002");
+            }
+            if i == 9999 {
+                assert_eq!(phone, "+1-202-555-0001");
+            }
+        }
     }
 }
 
-static AREA_CODES: [u32; 406] = [
+static REAL_AREA_CODES: [u32; 406] = [
 201,
 202,
 203,
