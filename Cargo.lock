@@ -1096,6 +1096,7 @@ dependencies = [
  "datanymizer_dumper",
  "datanymizer_engine",
  "env_logger",
+ "openssl",
  "structopt",
  "url",
 ]
