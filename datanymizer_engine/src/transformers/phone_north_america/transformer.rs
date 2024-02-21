@@ -68,7 +68,7 @@ impl Transformer for PhoneNorthAmericaTransformer {
         let area_code = {
             let mut state_area_code = STATE_AREA_CODE.lock().unwrap();
             let existing_area_code = if *state_area_code != 0 {
-                    *state_area_code  
+                    *state_area_code
             } else {
                 if self.real_area_code.unwrap_or_default() {
                     REAL_AREA_CODES[0]
@@ -95,7 +95,7 @@ impl Transformer for PhoneNorthAmericaTransformer {
             existing_area_code
         };
 
-        return Ok(Some(format!("+1-{area_code}-{middle:03}-{lower:04}")))
+        return Ok(Some(format!("+1 {area_code}-{middle:03}-{lower:04}")))
     }
 }
 
@@ -103,7 +103,7 @@ static STATE_LOWER_DIGITS: Mutex<u32> = Mutex::new(0);
 static STATE_MIDDLE_DIGITS: Mutex<u32> = Mutex::new(0);
 static STATE_AREA_CODE: Mutex<u32> = Mutex::new(0);
 
-#[cfg(test)] 
+#[cfg(test)]
 mod tests {
     use crate::{utils::EnumWrapper, Transformer, Transformers,
          transformers::PhoneNorthAmericaTransformer,
@@ -176,17 +176,17 @@ mod tests {
         let val1 = transformer.transform("field", "value", &None);
         let val2 = transformer.transform("field", "value", &None);
 
-        assert_eq!(val1.unwrap().unwrap(), "+1-201-000-0000");
-        assert_eq!(val2.unwrap().unwrap(), "+1-201-000-0001");
+        assert_eq!(val1.unwrap().unwrap(), "+1 201-000-0000");
+        assert_eq!(val2.unwrap().unwrap(), "+1 201-000-0001");
 
         for i in 0..10000 {
             let val = transformer.transform("field", "value", &None);
             let phone = val.unwrap().unwrap();
             if i == 1000 {
-                assert_eq!(phone, "+1-201-000-1002");
+                assert_eq!(phone, "+1 201-000-1002");
             }
             if i == 9999 {
-                assert_eq!(phone, "+1-201-001-0001");
+                assert_eq!(phone, "+1 201-001-0001");
             }
         }
     }
@@ -206,17 +206,17 @@ mod tests {
         let val1 = transformer.transform("field", "value", &None);
         let val2 = transformer.transform("field", "value", &None);
 
-        assert_eq!(val1.unwrap().unwrap(), "+1-201-555-0000");
-        assert_eq!(val2.unwrap().unwrap(), "+1-201-555-0001");
+        assert_eq!(val1.unwrap().unwrap(), "+1 201-555-0000");
+        assert_eq!(val2.unwrap().unwrap(), "+1 201-555-0001");
 
         for i in 0..10000 {
             let val = transformer.transform("field", "value", &None);
             let phone = val.unwrap().unwrap();
             if i == 1000 {
-                assert_eq!(phone, "+1-201-555-1002");
+                assert_eq!(phone, "+1 201-555-1002");
             }
             if i == 9999 {
-                assert_eq!(phone, "+1-202-555-0001");
+                assert_eq!(phone, "+1 202-555-0001");
             }
         }
     }
