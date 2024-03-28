@@ -121,7 +121,7 @@ impl Options {
         if let Ok(url) = Url::parse(self.database.as_str()) {
             return match url.scheme() {
                 "postgres" | "postgresql" => Ok(url),
-                _ => Err(anyhow!("Scheme url error")),
+                scheme => Err(anyhow!(format!("Scheme url error {}", scheme))),
             };
         }
         self.build_url(Some(self.database.to_string()).filter(|x| !x.is_empty()))
@@ -130,23 +130,30 @@ impl Options {
     fn build_url(&self, override_db_name: Option<String>) -> Result<Url> {
         let db_name = override_db_name.unwrap_or_else(|| self.db_name.clone());
         if db_name.is_empty() {
-            return Err(anyhow!("No one database passed"));
+            return Err(anyhow!("No database name given"));
         }
 
-        let mut url = Url::parse(format!("postgres://{}", self.host).as_str())?;
+        let mut url = Url::parse("postgres://")?;
+        url.set_host(Some(&self.host))
+            .map_err(|_| anyhow!("Cannot set host {} in postgres url {}", self.host, url))?;
+
         if self.port.is_some() {
             url.set_port(self.port)
-                .map_err(|_| anyhow!("Cannot set port"))?;
+                .map_err(|_| anyhow!("Cannot set port {} in postgres url {}", self.port.unwrap(), url))?;
         }
 
-        if self.username.is_some() {
-            url.set_username(self.username.as_deref().unwrap_or_default())
-                .map_err(|_| anyhow!("Cannot set username"))?;
+        match &self.username {
+            Some(user) => {
+                url.set_username(&user)
+                    .map_err(|_| anyhow!("Cannot set username {} in postgres url {}", &user, url))?;
+
+            }
+            None => {}
         }
 
         if self.password.is_some() {
             url.set_password(self.password.as_deref())
-                .map_err(|_| anyhow!("Cannot set password"))?;
+                .map_err(|_| anyhow!("Cannot set password in postgres url {}", url))?;
         }
 
         url.set_path(&db_name);

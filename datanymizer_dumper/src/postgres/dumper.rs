@@ -58,8 +58,9 @@ impl<W: 'static + Write + Send, I: 'static + Indicator + Send> PgDumper<W, I> {
             .output();
 
         let command_string = format!(
-                "{} {} {}",
+                "{} {} {} {}",
                 program,
+                self.pg_dump_args.join(" "),
                 args.into_iter()
                     .chain(table_args.iter().map(|s| s.as_str()))
                     .collect::<Vec<_>>()
@@ -68,6 +69,10 @@ impl<W: 'static + Write + Send, I: 'static + Indicator + Send> PgDumper<W, I> {
             );
 
         match dump_output_result {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                Err(e).context("pg_dump program not found")?;
+                Ok(())
+            }
             Err(e) => Err(e).context(format!("starting command: {}", command_string)),
             Ok(dump_output) => {
                 if !dump_output.status.success() {
