@@ -137,23 +137,29 @@ impl Options {
         url.set_host(Some(&self.host))
             .map_err(|_| anyhow!("Cannot set host {} in postgres url {}", self.host, url))?;
 
-        if self.port.is_some() {
-            url.set_port(self.port)
-                .map_err(|_| anyhow!("Cannot set port {} in postgres url {}", self.port.unwrap(), url))?;
+        match &self.port {
+            Some(port) if *port != 0 => {
+                url.set_port(self.port)
+                    .map_err(|_| anyhow!("Cannot set port {} in postgres url {}", self.port.unwrap(), url))?;
+            }
+            _ => {}
         }
 
         match &self.username {
-            Some(user) => {
+            Some(user) if user.is_empty() == false => {
                 url.set_username(&user)
                     .map_err(|_| anyhow!("Cannot set username {} in postgres url {}", &user, url))?;
 
             }
-            None => {}
+            _ => {}
         }
 
-        if self.password.is_some() {
-            url.set_password(self.password.as_deref())
-                .map_err(|_| anyhow!("Cannot set password in postgres url {}", url))?;
+        match &self.password {
+            Some(password) if password.is_empty() == false => {
+                url.set_password(self.password.as_deref())
+                    .map_err(|_| anyhow!("Cannot set password in postgres url {}", url))?;
+            }
+            _ => {}
         }
 
         url.set_path(&db_name);
