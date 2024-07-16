@@ -58,10 +58,20 @@ pub struct Options {
     )]
     pub host: String,
 
-    #[structopt(short, long, help = "Database server port number [default: 5432]", env = "PGPORT")]
+    #[structopt(
+        short,
+        long,
+        help = "Database server port number [default: 5432]",
+        env = "PGPORT"
+    )]
     pub port: Option<u16>,
 
-    #[structopt(short = "U", long, help = "Connect as specified database user", env = "PGUSER")]
+    #[structopt(
+        short = "U",
+        long,
+        help = "Connect as specified database user",
+        env = "PGUSER"
+    )]
     pub username: Option<String>,
 
     #[structopt(short = "W", long, help = "User password", env = "PGPASSWORD")]
