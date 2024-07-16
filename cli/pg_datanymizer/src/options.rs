@@ -22,7 +22,7 @@ impl Default for TransactionConfig {
 #[derive(StructOpt, Debug, Clone, Default)]
 #[structopt(name = "pg_datanymizer")]
 pub struct Options {
-    #[structopt(name = "DBNAME")]
+    #[structopt(name = "DBNAME", env = "PGDATABASE")]
     database: String,
 
     #[structopt(
@@ -53,17 +53,18 @@ pub struct Options {
         short,
         long,
         help = "Database server host or socket directory",
-        default_value = "localhost"
+        default_value = "localhost",
+        env = "PGHOST"
     )]
     pub host: String,
 
-    #[structopt(short, long, help = "Database server port number [default: 5432]")]
+    #[structopt(short, long, help = "Database server port number [default: 5432]", env = "PGPORT")]
     pub port: Option<u16>,
 
-    #[structopt(short = "U", long, help = "Connect as specified database user")]
+    #[structopt(short = "U", long, help = "Connect as specified database user", env = "PGUSER")]
     pub username: Option<String>,
 
-    #[structopt(short = "W", long, help = "User password")]
+    #[structopt(short = "W", long, help = "User password", env = "PGPASSWORD")]
     pub password: Option<String>,
 
     #[structopt(
@@ -106,6 +107,13 @@ pub struct Options {
         help = "Turn on verbose logging features to get more information about dumper errors"
     )]
     pub verbose: u64,
+
+    #[structopt(
+        long,
+        name = "no-indicator",
+        help = "Disable indicator"
+    )]
+    pub no_indicator: bool,
 }
 
 impl Options {
@@ -113,7 +121,7 @@ impl Options {
         if let Ok(url) = Url::parse(self.database.as_str()) {
             return match url.scheme() {
                 "postgres" | "postgresql" => Ok(url),
-                _ => Err(anyhow!("Scheme url error")),
+                scheme => Err(anyhow!(format!("Scheme url error {}", scheme))),
             };
         }
         self.build_url(Some(self.database.to_string()).filter(|x| !x.is_empty()))
@@ -122,18 +130,37 @@ impl Options {
     fn build_url(&self, override_db_name: Option<String>) -> Result<Url> {
         let db_name = override_db_name.unwrap_or_else(|| self.db_name.clone());
         if db_name.is_empty() {
-            return Err(anyhow!("No one database passed"));
+            return Err(anyhow!("No database name given"));
         }
 
-        let mut url = Url::parse(format!("postgres://{}", self.host).as_str())?;
-        url.set_port(self.port)
-            .map_err(|_| anyhow!("Cannot set port"))?;
+        let mut url = Url::parse("postgres://")?;
+        url.set_host(Some(&self.host))
+            .map_err(|_| anyhow!("Cannot set host {} in postgres url {}", self.host, url))?;
 
-        url.set_username(self.username.as_deref().unwrap_or_default())
-            .map_err(|_| anyhow!("Cannot set username"))?;
+        match &self.port {
+            Some(port) if *port != 0 => {
+                url.set_port(self.port)
+                    .map_err(|_| anyhow!("Cannot set port {} in postgres url {}", self.port.unwrap(), url))?;
+            }
+            _ => {}
+        }
 
-        url.set_password(self.password.as_deref())
-            .map_err(|_| anyhow!("Cannot set password"))?;
+        match &self.username {
+            Some(user) if user.is_empty() == false => {
+                url.set_username(&user)
+                    .map_err(|_| anyhow!("Cannot set username {} in postgres url {}", &user, url))?;
+
+            }
+            _ => {}
+        }
+
+        match &self.password {
+            Some(password) if password.is_empty() == false => {
+                url.set_password(self.password.as_deref())
+                    .map_err(|_| anyhow!("Cannot set password in postgres url {}", url))?;
+            }
+            _ => {}
+        }
 
         url.set_path(&db_name);
 
