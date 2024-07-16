@@ -1,5 +1,5 @@
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
-use std::time::Duration;
+use std::{time::Duration, panic};
 
 pub trait Indicator {
     fn start_pb(&self, _size: u64, _prefix: &str) {}
@@ -34,32 +34,61 @@ impl Default for ConsoleIndicator {
 
 impl Indicator for ConsoleIndicator {
     fn start_pb(&self, size: u64, name: &str) {
-        self.pb.set_length(size);
-        self.pb.set_prefix(name.to_owned());
-        self.pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "[Dumping: {prefix}] [|{bar:50}|] {pos} of {len} rows [{percent}%] ({eta})",
-                )
-                .unwrap()
-                .progress_chars("#>-"),
-        );
+        let result = panic::catch_unwind(|| {
+            self.pb.set_length(size);
+            self.pb.set_prefix(name.to_owned());
+            let template =
+                ProgressStyle::default_bar()
+                    .template(
+                        "[Dumping: {prefix}] [|{bar:50}|] {pos} of {len} rows [{percent}%] ({eta})",
+                    );
+            match template {
+                Ok(t) => {
+                    self.pb.set_style(
+                        t.progress_chars("#>-"),
+                    );
+                }
+                Err(e) => {
+                    self.debug_msg(&format!("{}", e));
+                }
+            }
+        });
+        match result {
+            Ok(_) => {},
+            Err(e) => {
+                self.debug_msg(&format!("inc_pb panic caught: {:?}", e))
+            },
+        }
     }
 
     fn inc_pb(&self, i: u64) {
-        self.pb.inc(i);
+        let result = panic::catch_unwind(||{
+            self.pb.inc(i);
+        });
+        match result {
+            Ok(_) => {},
+            Err(e) => {
+                self.debug_msg(&format!("inc_pb panic caught: {:?}", e))
+            },
+        }
     }
 
     fn finish_pb(&self, name: &str, duration: Duration) {
-        self.pb.finish();
-        self.pb.reset();
+        let result = panic::catch_unwind(||{
+            self.pb.finish();
+            self.pb.reset();
+        });
+        match result {
+            Ok(_) => {},
+            Err(e) => {
+                self.debug_msg(&format!("pb finish/reset panic caught: {:?}", e))
+            },
+        }
 
         self.debug_msg(
             format!(
                 "[Dumping: {}] Finished in {}",
-                name,
-                HumanDuration(duration)
-            )
+                name, HumanDuration(duration))
             .as_str(),
         );
     }

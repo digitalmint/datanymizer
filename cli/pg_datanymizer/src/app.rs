@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use std::{
     fs::File,
     io::{self, Write},
@@ -30,9 +30,14 @@ impl App {
     }
 
     pub fn run(&self) -> Result<()> {
-        match &self.options.file {
-            Some(filename) => self.make_dump(File::create(filename)?, ConsoleIndicator::new()),
-            None => self.make_dump(io::stdout(), SilentIndicator),
+        match (&self.options.file, &self.options.no_indicator) {
+            (Some(filename), false) => {
+                self.make_dump(File::create(filename)?, ConsoleIndicator::new())
+            },
+            (Some(filename), true) => {
+                self.make_dump(File::create(filename)?, SilentIndicator)
+            },
+            _ => self.make_dump(io::stdout(), SilentIndicator),
         }
     }
 
@@ -41,7 +46,8 @@ impl App {
         W: 'static + Write + Send,
         I: 'static + Indicator + Send,
     {
-        let mut connection = self.connector().connect()?;
+        let mut connection = self.connector().connect()
+            .with_context(|| format!("connecting to PG with dump arguments: {:?}", self.options.pg_dump_args))?;
         let engine = self.engine()?;
 
         PgDumper::new(
