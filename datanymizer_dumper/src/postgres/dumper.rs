@@ -3,7 +3,7 @@ use super::{
     table::PgTable,
 };
 use crate::{indicator::Indicator, Dumper, SchemaInspector, Table};
-use anyhow::Result;
+use anyhow::{Result, Context};
 use datanymizer_engine::{Engine, Filter, Settings, TableList};
 use log::warn;
 use postgres::IsolationLevel;
@@ -50,16 +50,17 @@ impl<W: 'static + Write + Send, I: 'static + Indicator + Send> PgDumper<W, I> {
         let args = vec!["--section", section];
         let table_args = table_args(&self.engine.settings.filter)?;
 
-        let dump_output = Command::new(program)
+        let dump_output_result = Command::new(program)
             .args(&self.pg_dump_args)
             .args(&args)
             .args(&table_args)
             .arg(db_url)
-            .output()?;
-        if !dump_output.status.success() {
-            eprintln!(
-                "pg_dump error. Command:\n{} {} {}\nOutput:",
+            .output();
+
+        let command_string = format!(
+                "{} {} {} {}",
                 program,
+                self.pg_dump_args.join(" "),
                 args.into_iter()
                     .chain(table_args.iter().map(|s| s.as_str()))
                     .collect::<Vec<_>>()
@@ -67,13 +68,24 @@ impl<W: 'static + Write + Send, I: 'static + Indicator + Send> PgDumper<W, I> {
                 db_url
             );
 
-            io::stderr().write_all(&dump_output.stderr)?;
-            process::exit(1);
-        }
+        match dump_output_result {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                Err(e).context("pg_dump program not found")?;
+                Ok(())
+            }
+            Err(e) => Err(e).context(format!("starting command: {}", command_string)),
+            Ok(dump_output) => {
+                if !dump_output.status.success() {
+                    eprintln!("pg_dump error. Command:\n{}\nOutput:", command_string);
+                    io::stderr().write_all(&dump_output.stderr)?;
+                    process::exit(1);
+                }
 
-        self.dump_writer
-            .write_all(&dump_output.stdout)
-            .map_err(|e| e.into())
+                self.dump_writer
+                    .write_all(&dump_output.stdout)
+                    .map_err(|e| e.into())
+                }
+            }
     }
 
     fn dump_table(&mut self, table: &PgTable, qw: &mut QueryWrapper) -> Result<()> {
